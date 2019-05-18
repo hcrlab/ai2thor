@@ -1,11 +1,8 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-//using UnityEditor;
-//using System.Linq;
 using UnityStandardAssets.Characters.FirstPerson;
 using System;
-using System.Linq;
+using UnityEngine.SceneManagement;
 using UnityStandardAssets.ImageEffects;
 
 [ExecuteInEditMode]
@@ -32,6 +29,10 @@ public class PhysicsSceneManager : MonoBehaviour
 	private Vector3 gizmopos;
 	private Vector3 gizmoscale;
 	private Quaternion gizmoquaternion;
+	private GameObject _anchor;
+	private GameObject _target;
+	private GameObject _receptacle;
+	private SimObjPhysics _receptaclePhysics;
 
 	private void OnEnable()
 	{
@@ -61,26 +62,62 @@ public class PhysicsSceneManager : MonoBehaviour
 			GameObject.Find("FirstPersonCharacter").
 			GetComponent<ScreenSpaceAmbientOcclusion>().enabled = true;
 		}
+		UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
 	}
 
 	public void SetupScene()
 	{
-        UniqueIDsInScene.Clear();
+		UniqueIDsInScene.Clear();
 		ReceptaclesInScene.Clear();
 		PhysObjectsInScene.Clear();
 		GatherSimObjPhysInScene();
 		GatherAllReceptaclesInScene();
 	}
-	// Use this for initialization
-	void Start () 
-	{
 
+	// clear table
+    // for now, assume we start from default FloorPlan1
+    // later, can find all objects in contact with the table and clear them off
+	void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+	{
+		int z = -3;
+		string[] objectsOnTable =
+		{
+			"Apple1",
+			"Bowl_1",
+			"bread_1",
+			"ButterKnife_1",
+			"CreditCard_4",
+			"PaperClutter1",
+			"Tomato_1"
+		};
+		List<string> objectsOnTableList = new List<string>(objectsOnTable);
+		foreach (string obj in objectsOnTableList)
+		{
+			GameObject moving = GameObject.Find(obj);
+			moving.transform.Translate(0, 0, z);
+		}
+	}
+	
+	// Use this for initialization
+	void Start ()
+	{
+		_receptacle = GameObject.Find("CounterTop_Physics");
+		_anchor = GameObject.Find("Bowl_1");
+		_target = GameObject.Find("Apple1");
+		GenerateLayout(_receptacle, _anchor, _target);
 	}
 	
 	// Update is called once per frame
 	void Update () 
 	{
+		if (Input.GetKeyUp(KeyCode.Space))
+			GenerateLayout(_receptacle, _anchor, _target);
+	}
 
+	void onDisable()
+	{
+		Debug.Log("OnDisable");
+		UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
 	}
 	public bool ToggleHideAndSeek(bool hide)
 	{
@@ -584,13 +621,13 @@ public class PhysicsSceneManager : MonoBehaviour
 	// place anchor and target object on receptacle (counter) according to specified parameters
 	//a seed of 0 is the default positions placed by hand(?)
 	public bool GenerateLayout(
-		int seed, 
-		SimObjPhysics receptacle, // receptacle upon which anchor and target should be placed (i.e. counter)
+//		int seed, 
+		GameObject receptacleObj, // receptacle upon which anchor and target should be placed (i.e. counter)
 		GameObject anchor, // anchor object, i.e. object with respect to which target is placed
-		GameObject target, // target object
-		bool SpawnOnlyOutside,
-		int maxcount,
-		bool StaticPlacement
+		GameObject target//, // target object
+//		bool SpawnOnlyOutside,
+//		int maxcount,
+//		bool StaticPlacement
 	) {
 		#if UNITY_EDITOR
 		var Masterwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -603,21 +640,44 @@ public class PhysicsSceneManager : MonoBehaviour
 			#endif
 			
 			return false;
-		}
-		
+		} 
+		// testing
+		int seed = 0;
+		bool SpawnOnlyOutside = true;
+		int maxcount = 10;
+		bool StaticPlacement = true;
+
+		SimObjPhysics receptacle = receptacleObj.GetComponent<SimObjPhysics>();
 		// step 0: get possible spawn points
+		
         List<ReceptacleSpawnPoint> targetReceptacleSpawnPoints = receptacle.ReturnMySpawnPoints(false);
-        // assign probability to each point
+        // TODO: assign probability to each point
         // choose according to these probabilities
-        targetReceptacleSpawnPoints.Shuffle(); // need to assign probability to each spawn point and choose accordingly
+        targetReceptacleSpawnPoints.Shuffle(); // for now, just choose randomly from uniform distribution
+        InstantiatePrefabTest spawner = gameObject.GetComponent<InstantiatePrefabTest>();
         
 
 		// step 1: place anchor
-        
+		int degreeIncrement = 360;
 
+		bool spawned = spawner.PlaceObjectReceptacle(targetReceptacleSpawnPoints, anchor.GetComponent<SimObjPhysics>(),
+			StaticPlacement, maxcount, degreeIncrement, true); //we spawn them stationary so things don't fall off of ledges
+        if (!spawned) {
+            #if UNITY_EDITOR
+            Debug.Log(anchor.name + " could not be spawned.");
+            #endif
+        }
+		
 		// step 2 : place target
-		// code involving target...
+		spawned = spawner.PlaceObjectReceptacle(targetReceptacleSpawnPoints, target.GetComponent<SimObjPhysics>(),
+			StaticPlacement, maxcount, degreeIncrement, true); //we spawn them stationary so things don't fall off of ledges
+        if (!spawned) {
+            #if UNITY_EDITOR
+            Debug.Log(anchor.name + " could not be spawned.");
+            #endif
+        }
 
+		return true;
 		// step 3: return config (?)
 		// should be able to delete most/all code below
 //		UnityEngine.Random.InitState(seed);
@@ -629,7 +689,7 @@ public class PhysicsSceneManager : MonoBehaviour
 
         //for each object in RequiredObjects, start a list of what objects it's allowed 
         //to spawn in by checking the PlacementRestrictions dictionary
-        foreach(GameObject go in SpawnedObjects) // TODO: change to work with anchor & target
+        foreach(GameObject go in SpawnedObjects)
         {
             AllowedToSpawnInAndExistsInScene = new Dictionary<SimObjType, List<SimObjPhysics>>();
 
@@ -640,11 +700,11 @@ public class PhysicsSceneManager : MonoBehaviour
             if(AllowedToSpawnInAndExistsInScene.Count > 0)
             {
                 //SimObjPhysics targetReceptacle;
-                InstantiatePrefabTest spawner = gameObject.GetComponent<InstantiatePrefabTest>();
+//                InstantiatePrefabTest spawner = gameObject.GetComponent<InstantiatePrefabTest>();
 //                List<ReceptacleSpawnPoint> targetReceptacleSpawnPoints;
         
                 //each sop here is a valid receptacle
-                bool spawned = false;
+//                bool spawned = false;
                 foreach(SimObjPhysics sop in ShuffleSimObjPhysicsDictList(AllowedToSpawnInAndExistsInScene))
                 {
                     //targetReceptacle = sop;
