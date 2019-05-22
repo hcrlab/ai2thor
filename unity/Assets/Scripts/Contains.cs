@@ -188,7 +188,8 @@ public class Contains : MonoBehaviour
 	//generate a grid of potential spawn points, set ReturnPointsClosestToAgent to true if
 	//the list of points should be filtered closest to agent, if false
 	//it will return all points on the receptacle regardless of agent proximity
-	public List<ReceptacleSpawnPoint> GetValidSpawnPoints(bool ReturnPointsCloseToAgent)
+	public List<ReceptacleSpawnPoint> GetValidSpawnPoints(bool ReturnPointsCloseToAgent,
+		int gridsize) //number of grid boxes we want, reduce this to SPEED THINGS UP but also GET WAY MORE INACCURATE
 	{
 		List<ReceptacleSpawnPoint> PossibleSpawnPoints = new List<ReceptacleSpawnPoint>();
 
@@ -219,8 +220,8 @@ public class Contains : MonoBehaviour
 		// Corners = crn;
 
 
-		//so lets make a grid, we can parametize the gridsize value later, for now we'll adjust it here
-		int gridsize = 8; //number of grid boxes we want, reduce this to SPEED THINGS UP but also GET WAY MORE INACCURATE
+		//so lets make a grid
+		// with default value of 8, we get a 9 x 9 grid
 		int linepoints = gridsize + 1; //number of points on the line we need to make the number of grid boxes
 		float lineincrement =  1.0f / gridsize; //increment on the line to distribute the gridpoints
 
