@@ -106,15 +106,15 @@ public class PhysicsSceneManager : MonoBehaviour
 		_receptacle = GameObject.Find("CounterTop_Physics");
 		_anchor = GameObject.Find("Bowl_1");
 		_target = GameObject.Find("Apple1");
-		_gridsize = 9;
-		GenerateLayout(_receptacle, _anchor, _target, _gridsize);
+		_gridsize = 20; // (_gridsize + 1 )^2 grid points
+		GenerateLayouts(_receptacle, _anchor, _target, _gridsize);
 	}
 	
 	// Update is called once per frame
 	void Update () 
 	{
-		if (Input.GetKeyUp(KeyCode.Space))
-			GenerateLayout(_receptacle, _anchor, _target, _gridsize);
+//		if (Input.GetKeyUp(KeyCode.Space))
+//			GenerateLayouts(_receptacle, _anchor, _target, _gridsize);
 	}
 
 	void onDisable()
@@ -623,10 +623,8 @@ public class PhysicsSceneManager : MonoBehaviour
 	//place each object in the array of objects that should appear in this scene randomly in valid receptacles
 	// place anchor and target object on receptacle (counter) according to specified parameters
 	//a seed of 0 is the default positions placed by hand(?)
-//	public bool GenerateLayout(
-// TODO: GenerateLayout should be GenerateLayouts. Should return a dictionary(?) of attempted layouts and boolean of
-// TODO: whether they were successful or not
-	public bool GenerateLayout(
+// TODO: Should return a dictionary(?) of attempted layouts and boolean of whether they were successful or not
+	public bool GenerateLayouts(
 //		int seed, 
 		GameObject receptacleObj, // receptacle upon which anchor and target should be placed (i.e. counter)
 		GameObject anchor, // anchor object, i.e. object with respect to which target is placed
@@ -659,11 +657,11 @@ public class PhysicsSceneManager : MonoBehaviour
 		SimObjPhysics receptacle = receptacleObj.GetComponent<SimObjPhysics>();
 		// step 0: get possible spawn points
 		
-        List<ReceptacleSpawnPoint> targetReceptacleSpawnPoints = receptacle.ReturnMySpawnPoints(false, gridsize);
-        Debug.Log(targetReceptacleSpawnPoints.Count);
+        List<ReceptacleSpawnPoint> receptacleSpawnPoints = receptacle.ReturnMySpawnPoints(false, gridsize);
+        Debug.Log(receptacleSpawnPoints.Count);
 //        targetReceptacleSpawnPoints.Shuffle(); // for now, just choose randomly from uniform distribution
         InstantiatePrefabTest spawner = gameObject.GetComponent<InstantiatePrefabTest>();
-        StartCoroutine(constructLayout(targetReceptacleSpawnPoints, spawner, anchor, StaticPlacement,
+        StartCoroutine(constructLayouts(receptacleSpawnPoints, spawner, anchor, target, StaticPlacement,
 	        maxcount, degreeIncrement, true));
         
 		return true;
@@ -692,25 +690,80 @@ public class PhysicsSceneManager : MonoBehaviour
 	}
 
 	// TODO: constructLayouts actually tries the layouts and updates dictionary with whether layout successful or not
-	public IEnumerator constructLayout(List<ReceptacleSpawnPoint> targetReceptacleSpawnPoints, InstantiatePrefabTest spawner,
-		GameObject anchor, bool PlaceStationary, int maxcount, int degreeIncrement, bool AlwaysPlaceUpright)
+	public IEnumerator constructLayouts(List<ReceptacleSpawnPoint> receptacleSpawnPoints, InstantiatePrefabTest spawner,
+		GameObject anchor, GameObject target, bool PlaceStationary, int maxcount, int degreeIncrement, bool AlwaysPlaceUpright)
 	{
-        // step 1: place anchor
-        List<ReceptacleSpawnPoint> pointList = new List<ReceptacleSpawnPoint>();
-        pointList.Add(targetReceptacleSpawnPoints[0]);
-        bool spawned;
-		foreach (ReceptacleSpawnPoint point in targetReceptacleSpawnPoints)
+        bool anchorSpawned;
+        bool targetSpawned;
+        Quaternion rotation;
+        
+		// radius of anchor
+		Vector3 anchorSize = anchor.GetComponent<SimObjPhysics>().BoundingBox.GetComponent<BoxCollider>().size;
+		float r_a = anchorSize[0]/2; // radius_anchor
+		
+		// height of anchor
+		float h_a = anchorSize[1]; // height_anchor
+		
+		// radius of target
+		Vector3 targetSize = target.GetComponent<SimObjPhysics>().BoundingBox.GetComponent<BoxCollider>().size;
+		float r_t = targetSize[0]/2; // radius_target
+		
+		// construct list of distances
+		List<float> distances = new List<float> {0, r_a + r_t, r_a + 2*r_t, r_a + 4*r_t, r_a + 8*r_t};
+		
+		// construct list of heights
+		List<float> heights = new List<float> {0, h_a, 2*h_a};
+		
+		// construct list of angles
+		List<int> angles = new List<int> {0, 45, 90, 135, 180, 225, 270, 315};
+		
+        List<ReceptacleSpawnPoint> pointList = new List<ReceptacleSpawnPoint>(1);
+        List<ReceptacleSpawnPoint> targetPointList = new List<ReceptacleSpawnPoint>(1);
+        ReceptacleSpawnPoint firstRSP = receptacleSpawnPoints[0];
+        pointList.Add(firstRSP);
+        targetPointList.Add(new ReceptacleSpawnPoint(Vector3.zero, firstRSP.ReceptacleBox, firstRSP.Script, firstRSP.ParentSimObjPhys));
+		foreach (ReceptacleSpawnPoint point in receptacleSpawnPoints)
 		{
 			pointList[0] = point;
-			spawned = spawner.PlaceObjectReceptacle(pointList, anchor.GetComponent<SimObjPhysics>(),
-			PlaceStationary, maxcount, degreeIncrement, AlwaysPlaceUpright);
-            if (!spawned) {
-                #if UNITY_EDITOR
-                Debug.Log(anchor.name + " could not be spawned.");
-                #endif
+			anchorSpawned = spawner.PlaceObjectReceptacle(pointList, anchor.GetComponent<SimObjPhysics>(),
+                PlaceStationary, maxcount, degreeIncrement, AlwaysPlaceUpright, true);
+			// if spawn successful, try placing target
+			if (anchorSpawned)
+			{
+//				Debug.Log("Anchor coordinates: " +  pointList[0].Point);
+				foreach (int angle in angles)
+				{
+					foreach (float distance in distances)
+					{
+						// ignoring height for now
+						rotation = Quaternion.AngleAxis(angle, Vector3.up);
+						targetPointList[0].Point = point.Point + rotation * Vector3.left * distance;
+                        targetSpawned = spawner.PlaceObjectReceptacle(targetPointList, target.GetComponent<SimObjPhysics>(),
+                            PlaceStationary, maxcount, degreeIncrement, AlwaysPlaceUpright, true);
+                        if (targetSpawned && distance > 0)
+                        {
+//							Debug.Log("Target coordinates: " + targetPointList[0].Point);
+	                        Debug.Log("Angle: " + angle);
+	                        Debug.Log("Distance: " + distance.ToString("R"));
+                        }
+//                        if (!targetSpawned)
+//                        {
+//	                        break;
+//                        }
+					}
+				}
+//				rotation = Quaternion.AngleAxis(45, Vector3.up);
+//				point.Point += rotation * Vector3.left*0;
+//				spawner.PlaceObjectReceptacle(pointList, target.GetComponent<SimObjPhysics>(),
+//					PlaceStationary, maxcount, degreeIncrement, AlwaysPlaceUpright, true);
+			}
+            if (!anchorSpawned) {
+//                #if UNITY_EDITOR
+//                Debug.Log(anchor.name + " could not be spawned.");
+//                #endif
             }
-//            yield return null;
-            yield return new WaitForSeconds(0.3f);
+            yield return null;
+//            yield return new WaitForSeconds(0.7f);
 		}
 	}
 
@@ -864,6 +917,4 @@ public class PhysicsSceneManager : MonoBehaviour
 
     }
 #endif
-
-		
 }

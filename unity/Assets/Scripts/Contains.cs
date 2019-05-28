@@ -250,17 +250,17 @@ public class Contains : MonoBehaviour
 			}
 		}
 		
-		//****** */debug draw the grid points as gizmos
-		// #if UNITY_EDITOR
-		// gridVisual = gridpoints.ToArray();
-		// #endif
+//		****** */debug draw the grid points as gizmos
+//		 #if UNITY_EDITOR
+//		 gridVisual = gridpoints.ToArray();
+//		 #endif
 
 		foreach(Vector3 point in gridpoints)
 		{
 			//debug draw the gridpoints if you wanna see em
-			// #if UNITY_EDITOR
-			// Debug.DrawLine(point, point + -(ydir * ydist), Color.red, 100f);
-			// #endif
+//			#if UNITY_EDITOR
+//			Debug.DrawLine(point, point + -(ydir * ydist), Color.red, 100f);
+//			#endif
 
 			// //quick test to see if this point on the grid is blocked by anything by raycasting down
 			// //toward it

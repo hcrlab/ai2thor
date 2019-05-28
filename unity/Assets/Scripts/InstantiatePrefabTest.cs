@@ -172,7 +172,7 @@ public class InstantiatePrefabTest : MonoBehaviour
     //The ReceptacleSpawnPoint list should be sorted based on what we are doing. If placing from the agent's hand, the list
     //should be sorted by distance to agent so the closest points are checked first. If used for Random Initial Spawn, it should
     //be randomized so that the random spawn is... random
-    public bool PlaceObjectReceptacle(List<ReceptacleSpawnPoint> rsps, SimObjPhysics sop, bool PlaceStationary, int maxcount, int degreeIncrement, bool AlwaysPlaceUpright)
+    public bool PlaceObjectReceptacle(List<ReceptacleSpawnPoint> rsps, SimObjPhysics sop, bool PlaceStationary, int maxcount, int degreeIncrement, bool AlwaysPlaceUpright, bool generateLayout = false)
     {
         
         if(rsps == null)
@@ -205,7 +205,7 @@ public class InstantiatePrefabTest : MonoBehaviour
             //Placing objects in/on an Object Specific Receptacle uses different logic to place the
             //object at the Attachemnet point rather than in the spawn area, so stop this right now!
 
-            if(PlaceObject(sop, p, PlaceStationary, degreeIncrement, AlwaysPlaceUpright))
+            if(PlaceObject(sop, p, PlaceStationary, degreeIncrement, AlwaysPlaceUpright, generateLayout))
             {
                 //found a place to spawn! neato, return success
                 return true;
@@ -229,7 +229,7 @@ public class InstantiatePrefabTest : MonoBehaviour
         }
     }
 
-    public bool PlaceObject(SimObjPhysics sop, ReceptacleSpawnPoint rsp, bool PlaceStationary, int degreeIncrement, bool AlwaysPlaceUpright)
+    public bool PlaceObject(SimObjPhysics sop, ReceptacleSpawnPoint rsp, bool PlaceStationary, int degreeIncrement, bool AlwaysPlaceUpright, bool generateLayout = false)
 	{
         if(rsp.ParentSimObjPhys == sop)
         {
@@ -345,7 +345,7 @@ public class InstantiatePrefabTest : MonoBehaviour
         foreach(RotationAndDistanceValues quat in ToCheck)
         {
             //if spawn area is clear, spawn it and return true that we spawned it
-            if(CheckSpawnArea(sop, rsp.Point + rsp.ParentSimObjPhys.transform.up * (quat.distance + yoffset), quat.rotation, false))
+            if(CheckSpawnArea(sop, rsp.Point + rsp.ParentSimObjPhys.transform.up * (quat.distance + yoffset), quat.rotation, false, generateLayout))
             {
                 //now to do a check to make sure the sim object is contained within the Receptacle box, and doesn't have
                 //bits of it hanging out
@@ -475,7 +475,8 @@ public class InstantiatePrefabTest : MonoBehaviour
     //All adjustments to the Bounding Box must be done on the collider only using the
     //"Edit Collider" button if you need to change the size
     //this assumes that the BoundingBox transform is zeroed out according to the root transform of the prefab
-    private bool CheckSpawnArea(SimObjPhysics simObj, Vector3 position, Quaternion rotation, bool spawningInHand)
+    private bool CheckSpawnArea(SimObjPhysics simObj, Vector3 position, Quaternion rotation, bool spawningInHand,
+        bool generateLayout = false) // if calling via GenerateLayouts (see PhysicsSceneManager), should always return true
     {
 		int layermask;
 
@@ -553,10 +554,13 @@ public class InstantiatePrefabTest : MonoBehaviour
         //     print(c.GetComponentInParent<Rigidbody>().transform.name);
         // }
         //if a collider was hit, then the space is not clear to spawn
-		if (hitColliders.Length > 0)
-		{
-			return false;
-		}
+        if (!generateLayout)
+        {
+            if (hitColliders.Length > 0)
+            {
+                return false;
+            }
+        }
 		return true;
 	}
 
