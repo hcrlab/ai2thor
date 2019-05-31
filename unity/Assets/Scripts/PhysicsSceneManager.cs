@@ -730,7 +730,6 @@ public class PhysicsSceneManager : MonoBehaviour
 			// if spawn successful, try placing target
 			if (anchorSpawned)
 			{
-//				Debug.Log("Anchor coordinates: " +  pointList[0].Point);
 				foreach (int angle in angles)
 				{
 					foreach (float distance in distances)
@@ -740,30 +739,19 @@ public class PhysicsSceneManager : MonoBehaviour
 						targetPointList[0].Point = point.Point + rotation * Vector3.left * distance;
                         targetSpawned = spawner.PlaceObjectReceptacle(targetPointList, target.GetComponent<SimObjPhysics>(),
                             PlaceStationary, maxcount, degreeIncrement, AlwaysPlaceUpright, true);
-                        if (targetSpawned && distance > 0)
+                        if (!targetSpawned)
                         {
-//							Debug.Log("Target coordinates: " + targetPointList[0].Point);
-	                        Debug.Log("Angle: " + angle);
-	                        Debug.Log("Distance: " + distance.ToString("R"));
+	                        break;
                         }
-//                        if (!targetSpawned)
-//                        {
-//	                        break;
-//                        }
+                        yield return null; // put this after break, so frames where target doesn't spawn aren't rendered
 					}
 				}
-//				rotation = Quaternion.AngleAxis(45, Vector3.up);
-//				point.Point += rotation * Vector3.left*0;
-//				spawner.PlaceObjectReceptacle(pointList, target.GetComponent<SimObjPhysics>(),
-//					PlaceStationary, maxcount, degreeIncrement, AlwaysPlaceUpright, true);
 			}
-            if (!anchorSpawned) {
+//            if (!anchorSpawned) {
 //                #if UNITY_EDITOR
 //                Debug.Log(anchor.name + " could not be spawned.");
 //                #endif
-            }
-            yield return null;
-//            yield return new WaitForSeconds(0.7f);
+//            }
 		}
 	}
 
